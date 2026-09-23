@@ -3,22 +3,37 @@ const API_URL = "https://main-pg-backend.onrender.com";
 export const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem("token");
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && {
-        Authorization: `Bearer ${token}`,
-      }),
-      ...options.headers,
-    },
-  });
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && {
+          Authorization: `Bearer ${token}`,
+        }),
+        ...options.headers,
+      },
+    });
 
-  const data = await response.json();
+    const text = await response.text();
 
-  if (!response.ok) {
-    throw new Error(data.message || "Something went wrong");
+    let data = {};
+
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { message: text };
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || "Something went wrong");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("API Error:", error);
+    throw error;
   }
-
-  return data;
 };
