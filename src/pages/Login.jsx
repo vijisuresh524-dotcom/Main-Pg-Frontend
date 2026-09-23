@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {FaTasks} from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
+import { apiRequest } from "../services/api";
 
 
 const Login = () => {
@@ -10,7 +11,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!email || !password) {
@@ -18,19 +19,21 @@ const Login = () => {
       return;
     }
      
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-     const user = users.find(
-      (u) => u.email === email && u.password === password
-    );
+    const response = await apiRequest("/auth/login", {
+  method: "POST",
+  body: JSON.stringify({
+    email,
+    password,
+  }),
+});
 
-    if (!user) {
-      setMessage("Invalid Email or Password");
-      return;
-    }
+localStorage.setItem("token", response.token);
+localStorage.setItem(
+  "loggedInUser",
+  JSON.stringify(response.user)
+);
 
-      localStorage.setItem("loggedInUser", JSON.stringify(user));
-
-    navigate("/dashboard");
+navigate("/dashboard");
   };
 
   return (

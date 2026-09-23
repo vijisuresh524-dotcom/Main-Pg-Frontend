@@ -1,129 +1,202 @@
 import { useState, useEffect } from "react";
-import React from "react";
 import Navbar from "../component/NavBar";
 import TaskForm from "../component/TaskForm";
 import TaskCard from "../component/TaskCard";
 import Footer from "../component/Footer";
-
+import { apiRequest } from "../services/api";
 
 const DashBoard = () => {
   const [showForm, setShowForm] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+
   const [search, setSearch] = useState("");
- const [priority, setPriority] = useState("");
- const [status, setStatus] = useState("");
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("");
 
-const user = JSON.parse(localStorage.getItem("loggedInUser"));
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-const [tasks, setTasks] = useState(() => {
-  if (!user) return [];
+  // --------------------------------
+  // GET LOGGED-IN USER
+  // --------------------------------
 
-  const savedTasks =
-    JSON.parse(localStorage.getItem(`tasks_${user.email}`)) || [];
-
-  return savedTasks.map((task) => ({
-    ...task,
-    status: task.status || "Pending",
-  }));
-});
-
-useEffect(() => {
-  if (user) {
-    localStorage.setItem(
-      `tasks_${user.email}`,
-      JSON.stringify(tasks)
-    );
-  }
-}, [tasks]);
-
-const addTask = (task) => {
-  let updatedTasks;
-
-  if (editingTask) {
-    // Update existing task
-    updatedTasks = tasks.map((t) =>
-      t.id === editingTask.id
-        ? {
-            ...t,
-            ...task,
-            id: editingTask.id,
-          }
-        : t
-    );
-
-    setEditingTask(null);
-  } else {
-    // Add new task
-    const newTask = {
-      id: Date.now(),
-      status: "Pending",
-      ...task,
-    };
-
-    updatedTasks = [...tasks, newTask];
-  }
-
-  setTasks(updatedTasks);
-
-  localStorage.setItem(
-    `tasks_${user.email}`,
-    JSON.stringify(updatedTasks)
+  const user = JSON.parse(
+    localStorage.getItem("loggedInUser")
   );
 
-  setShowForm(false);
-};
-    
-  // Edit
+  // --------------------------------
+  // FETCH TASKS FROM BACKEND
+  // --------------------------------
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+
+      const response = await apiRequest("/tasks");
+
+      setTasks(response.tasks || []);
+    } catch (error) {
+      console.error("Failed to fetch tasks:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchTasks();
+    }
+  }, []);
+
+  // --------------------------------
+  // ADD / EDIT TASK
+  // --------------------------------
+
+  const addTask = async (task) => {
+    try {
+      if (editingTask) {
+        // EDIT EXISTING TASK
+
+        const response = await apiRequest(
+          `/tasks/${editingTask._id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(task),
+          }
+        );
+
+        setTasks((prevTasks) =>
+          prevTasks.map((t) =>
+            t._id === editingTask._id
+              ? response.task
+              : t
+          )
+        );
+
+        setEditingTask(null);
+      } else {
+        // ADD NEW TASK
+
+        const response = await apiRequest("/tasks", {
+          method: "POST",
+          body: JSON.stringify({
+            ...task,
+            status: "Pending",
+          }),
+        });
+
+        setTasks((prevTasks) => [
+          response.task,
+          ...prevTasks,
+        ]);
+      }
+
+      setShowForm(false);
+
+    } catch (error) {
+      alert(
+        error.message || "Failed to save task"
+      );
+    }
+  };
+
+  // --------------------------------
+  // EDIT TASK
+  // --------------------------------
+
   const editTask = (task) => {
     setEditingTask(task);
     setShowForm(true);
   };
 
-  // Delete
- const deleteTask = (id) => {
-  const updatedTasks = tasks.filter((task) => task.id !== id);
+  // --------------------------------
+  // DELETE TASK
+  // --------------------------------
 
-  setTasks(updatedTasks);
+  const deleteTask = async (id) => {
+    try {
+      await apiRequest(`/tasks/${id}`, {
+        method: "DELETE",
+      });
 
-  localStorage.setItem(
-    `tasks_${user.email}`,
-    JSON.stringify(updatedTasks)
-  );
+      setTasks((prevTasks) =>
+        prevTasks.filter(
+          (task) => task._id !== id
+        )
+      );
+
+    } catch (error) {
+      alert(
+        error.message || "Failed to delete task"
+      );
+    }
+  };
+
+  // --------------------------------
+  // CHANGE TASK STATUS
+  // --------------------------------
+
+ const handleStatusChange = async (id, newStatus) => {
+  try {
+    const response = await apiRequest(`/tasks/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        status: newStatus,
+      }),
+    });
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task._id === id
+          ? response.task
+          : task
+      )
+    );
+
+    // Tell Navbar to refresh notifications
+    window.dispatchEvent(
+      new Event("taskUpdated")
+    );
+
+  } catch (error) {
+    alert(
+      error.message ||
+        "Failed to update task status"
+    );
+  }
 };
 
- // Filtering should be OUTSIDE useEffect
+  // --------------------------------
+  // FILTER TASKS
+  // --------------------------------
+
   const filteredTasks = tasks
-  .filter((task) =>
-    task.title.toLowerCase().includes(search.toLowerCase())
-  )
-  .filter((task) =>
-    priority === "" || task.priority === priority
-  )
-  .filter((task) =>
-    status === "" || task.status === status
-  );
+    .filter((task) =>
+      task.title
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    )
+    .filter(
+      (task) =>
+        priority === "" ||
+        task.priority === priority
+    )
+    .filter(
+      (task) =>
+        status === "" ||
+        task.status === status
+    );
 
-  // status
-const handleStatusChange = (id, status) => {
-  const updatedTasks = tasks.map((task) =>
-    task.id === id
-      ? { ...task, status }
-      : task
-  );
+  // --------------------------------
+  // RENDER
+  // --------------------------------
 
-  setTasks(updatedTasks);
-
-  localStorage.setItem(
-    `tasks_${user.email}`,
-    JSON.stringify(updatedTasks)
-  );
-
-  console.log(`Task ${id} changed to ${status}`);
-};   
   return (
     <div>
+
       <Navbar />
+
+      {/* TASK FORM */}
 
       {showForm && (
         <TaskForm
@@ -138,131 +211,179 @@ const handleStatusChange = (id, status) => {
 
       <div className="min-h-screen bg-gradient-to-br from-[#EEF2FF] via-[#F8FAFC] to-[#E0E7FF]">
 
-  {/* Hero Section */}
+      {/* HERO SECTION */}
 
-  <section className="mx-6 mt-30 rounded-3xl bg-gradient-to-r from-[#341B88] to-[#5B3FD6] text-white p-10 shadow-xl">
+<section className="mx-4 mt-8 rounded-3xl bg-gradient-to-r from-[#341B88] to-[#5B3FD6] p-6 text-white shadow-xl sm:mx-6 sm:mt-10 sm:p-8 lg:p-10">
 
-    <div className="flex justify-between items-center">
+  <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
 
-      <div>
+    {/* HERO CONTENT */}
 
-        <h1 className="text-5xl font-bold">
-          Welcome back 👋
-        </h1>
+    <div>
+      <h1 className="text-3xl font-bold sm:text-4xl lg:text-5xl">
+        Welcome back 👋
+      </h1>
 
-        <p className="mt-4 text-lg text-gray-200">
-          Stay organized, complete tasks and boost productivity.
-        </p>
-
-      </div>
-
-      <button
-        onClick={()=>{
-          setEditingTask(null);
-          setShowForm(true);
-        }}
-        className="bg-cyan-300 text-[#341B88] font-semibold px-8 py-4 rounded-xl hover:bg-cyan-200 transition"
-      >
-        + Add Task
-      </button>
-
+      <p className="mt-3 max-w-2xl text-base text-gray-200 sm:mt-4 sm:text-lg">
+        Stay organized, complete tasks
+        and boost productivity.
+      </p>
     </div>
 
-  </section>
+    {/* ADD TASK BUTTON */}
 
-  {/* Search & Filter */}
+    <button
+      onClick={() => {
+        setEditingTask(null);
+        setShowForm(true);
+      }}
+      className="w-full rounded-xl bg-cyan-300 px-6 py-3 font-semibold text-black transition hover:bg-indigo-700  sm:w-auto sm:px-8 sm:py-4"
+    >
+      + Add Task
+    </button>
 
-  <section className="mx-6 mt-6 bg-white rounded-2xl shadow-lg p-5">
+  </div>
 
-    <div className="flex flex-wrap gap-4">
+</section>
 
-     <input
-  type="text"
-  placeholder="Search task..."
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  className="flex-1 border rounded-xl px-4 py-3 outline-none"
-/>
+        {/* SEARCH & FILTER */}
 
-{/* Priority Filter */}
-     <select
-  value={priority}
-  onChange={(e) => setPriority(e.target.value)}
-  className="border rounded-xl px-4 py-3"
->
-  <option value="">All Priority</option>
-  <option value="High">High</option>
-  <option value="Medium">Medium</option>
-  <option value="Low">Low</option>
-</select>
+        <section className="mx-6 mt-6 bg-white rounded-2xl shadow-lg p-5">
 
+          <div className="flex flex-wrap gap-4">
 
-{/* Status Filter */}
-      <select
-  value={status}
-  onChange={(e) => setStatus(e.target.value)}
-  className="border rounded-xl px-4 py-3"
->
-  <option value="">All Status</option>
-  <option value="Pending">Pending</option>
+            {/* SEARCH */}
 
-        <option value="In Progress">In Progress</option>
+            <input
+              type="text"
+              placeholder="Search task..."
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              className="flex-1 border rounded-xl px-4 py-3 outline-none"
+            />
 
-        <option value="Completed">Completed</option>
+            {/* PRIORITY */}
 
-      </select>
+            <select
+              value={priority}
+              onChange={(e) =>
+                setPriority(e.target.value)
+              }
+              className="border rounded-xl px-4 py-3"
+            >
+              <option value="">
+                All Priority
+              </option>
 
-      
+              <option value="High">
+                High
+              </option>
+
+              <option value="Medium">
+                Medium
+              </option>
+
+              <option value="Low">
+                Low
+              </option>
+
+            </select>
+
+            {/* STATUS */}
+
+            <select
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value)
+              }
+              className="border rounded-xl px-4 py-3"
+            >
+              <option value="">
+                All Status
+              </option>
+
+              <option value="Pending">
+                Pending
+              </option>
+
+              <option value="In Progress">
+                In Progress
+              </option>
+
+              <option value="Completed">
+                Completed
+              </option>
+
+            </select>
+
+          </div>
+
+        </section>
+
+        {/* TASKS */}
+
+        <section className="p-6">
+
+          <h2 className="text-3xl font-bold text-[#341B88] mb-6">
+            My Tasks
+          </h2>
+
+          {/* LOADING */}
+
+          {loading ? (
+
+            <div className="text-center py-20">
+
+              <p className="text-xl text-gray-500">
+                Loading tasks...
+              </p>
+
+            </div>
+
+          ) : filteredTasks.length > 0 ? (
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+              {filteredTasks.map((task) => (
+
+                <TaskCard
+                  key={task._id}
+                  task={task}
+                  onEdit={editTask}
+                  onDelete={deleteTask}
+                 
+                />
+
+              ))}
+
+            </div>
+
+          ) : (
+
+            <div className="col-span-full text-center py-20 bg-white rounded-2xl shadow">
+
+              <h2 className="text-3xl font-bold text-gray-700">
+                No Tasks Yet
+              </h2>
+
+              <p className="text-gray-500 mt-3">
+                Click the Add Task button to
+                create your first task.
+              </p>
+
+            </div>
+
+          )}
+
+        </section>
+
+        <Footer />
+
+      </div>
+
     </div>
-
-  </section>
-
-  {/* Tasks */}
-
-  <section className="p-6">
-
-    <h2 className="text-3xl font-bold text-[#341B88] mb-6">
-      My Tasks
-    </h2>
-
-   {filteredTasks.length > 0 ? (
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-
-       {filteredTasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={editTask}
-            onDelete={deleteTask}
-            onStatusChange={handleStatusChange}
-          />
-        ))}
-
-      </div>
-
-    ) : (
-
-      <div className="col-span-full text-center py-20 bg-white rounded-2xl shadow">
-
-        <h2 className="text-3xl font-bold text-gray-700">
-          No Tasks Yet
-        </h2>
-
-        <p className="text-gray-500 mt-3">
-          Click the Add Task button to create your first task.
-        </p>
-
-      </div>
-
-    )}
-
-  </section>
-<Footer />
-</div>
-    
-      </div>
-    
   );
 };
 

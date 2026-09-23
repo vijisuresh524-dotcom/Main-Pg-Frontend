@@ -1,179 +1,424 @@
-import React, { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import Navbar from "../component/NavBar";
 import Footer from "../component/Footer";
 import KanbanCard from "../component/KanbanCard";
-import { Navigate } from "react-router-dom";
+import { apiRequest } from "../services/api";
 
 const KanbanBoard = () => {
-  const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser"));
+  const [tasks, setTasks] = useState([]);
 
-  if (!loggedInUser) {
-    return <Navigate to="/login" replace />;
-  }
+  const [loading, setLoading] =
+    useState(true);
 
-  const [search, setSearch] = useState("");
+  // Column currently being dragged over
+  const [dragOverColumn, setDragOverColumn] =
+    useState(null);
 
-  const tasks =
-    JSON.parse(localStorage.getItem(`tasks_${loggedInUser.email}`)) || [];
+  // Task currently being dragged
+  const [draggingTask, setDraggingTask] =
+    useState(null);
 
-  const filteredTasks = tasks.filter(
-    (task) =>
-      task.title.toLowerCase().includes(search.toLowerCase()) ||
-      task.description.toLowerCase().includes(search.toLowerCase())
-  );
+  // --------------------------------
+  // FETCH TASKS
+  // --------------------------------
 
-  const pending = filteredTasks.filter(
-    (task) => task.status === "Pending"
-  );
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
 
-  const progress = filteredTasks.filter(
-    (task) => task.status === "In Progress"
-  );
+      const response =
+        await apiRequest("/tasks");
 
-  const completed = filteredTasks.filter(
-    (task) => task.status === "Completed"
-  );
+      setTasks(response.tasks || []);
+    } catch (error) {
+      console.error(
+        "Failed to fetch tasks:",
+        error.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  // --------------------------------
+  // UPDATE TASK STATUS
+  // --------------------------------
+
+  const updateTaskStatus = async (
+    task,
+    newStatus
+  ) => {
+    if (!task) {
+      return;
+    }
+
+    if (task.status === newStatus) {
+      return;
+    }
+
+    try {
+      const response =
+        await apiRequest(
+          `/tasks/${task._id}/status`,
+          {
+            method: "PATCH",
+
+            body: JSON.stringify({
+              status: newStatus,
+            }),
+          }
+        );
+
+      // Update UI
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item._id === task._id
+            ? response.task
+            : item
+        )
+      );
+
+      // Refresh navbar notifications
+      window.dispatchEvent(
+        new Event("taskUpdated")
+      );
+    } catch (error) {
+      console.error(
+        "Status update error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Failed to update task status"
+      );
+    }
+  };
+
+  // --------------------------------
+  // POINTER DOWN
+  // --------------------------------
+
+  const handlePointerDown = (
+    event,
+    task
+  ) => {
+    // Only handle primary mouse/touch
+    if (!event.isPrimary) {
+      return;
+    }
+
+    // Ignore if user touched the select
+    if (
+      event.target.tagName === "SELECT" ||
+      event.target.tagName === "OPTION"
+    ) {
+      return;
+    }
+
+    setDraggingTask(task);
+  };
+
+  // --------------------------------
+  // POINTER MOVE
+  // --------------------------------
+
+  useEffect(() => {
+    if (!draggingTask) {
+      return;
+    }
+
+    const handlePointerMove = (
+      event
+    ) => {
+      if (!event.isPrimary) {
+        return;
+      }
+
+      // Prevent mobile scrolling while dragging
+      event.preventDefault();
+
+      const element =
+        document.elementFromPoint(
+          event.clientX,
+          event.clientY
+        );
+
+      const column =
+        element?.closest(
+          "[data-kanban-status]"
+        );
+
+      if (column) {
+        const status =
+          column.getAttribute(
+            "data-kanban-status"
+          );
+
+        setDragOverColumn(status);
+      } else {
+        setDragOverColumn(null);
+      }
+    };
+
+    const handlePointerUp = async (
+      event
+    ) => {
+      if (!event.isPrimary) {
+        return;
+      }
+
+      const element =
+        document.elementFromPoint(
+          event.clientX,
+          event.clientY
+        );
+
+      const column =
+        element?.closest(
+          "[data-kanban-status]"
+        );
+
+      if (column) {
+        const newStatus =
+          column.getAttribute(
+            "data-kanban-status"
+          );
+
+        await updateTaskStatus(
+          draggingTask,
+          newStatus
+        );
+      }
+
+      setDraggingTask(null);
+      setDragOverColumn(null);
+    };
+
+    window.addEventListener(
+      "pointermove",
+      handlePointerMove,
+      {
+        passive: false,
+      }
+    );
+
+    window.addEventListener(
+      "pointerup",
+      handlePointerUp
+    );
+
+    window.addEventListener(
+      "pointercancel",
+      handlePointerUp
+    );
+
+    return () => {
+      window.removeEventListener(
+        "pointermove",
+        handlePointerMove
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        handlePointerUp
+      );
+
+      window.removeEventListener(
+        "pointercancel",
+        handlePointerUp
+      );
+    };
+  }, [draggingTask]);
+
+  // --------------------------------
+  // FILTER TASKS
+  // --------------------------------
+
+  const pendingTasks =
+    tasks.filter(
+      (task) =>
+        task.status === "Pending"
+    );
+
+  const progressTasks =
+    tasks.filter(
+      (task) =>
+        task.status === "In Progress"
+    );
+
+  const completedTasks =
+    tasks.filter(
+      (task) =>
+        task.status === "Completed"
+    );
+
+  // --------------------------------
+  // RENDER COLUMN
+  // --------------------------------
+
+  const renderColumn = (
+    title,
+    status,
+    columnTasks,
+    bgColor
+  ) => {
+    const isDragOver =
+      dragOverColumn === status;
+
+    return (
+      <div
+        data-kanban-status={status}
+        className={`flex min-h-[500px] flex-col rounded-2xl bg-white p-4 shadow-lg transition sm:p-5 ${
+          isDragOver
+            ? "bg-purple-50 ring-4 ring-[#341B88]"
+            : ""
+        }`}
+      >
+        {/* COLUMN HEADER */}
+
+        <div
+          className={`mb-5 rounded-xl p-4 ${bgColor}`}
+        >
+          <h2 className="text-xl font-bold text-[#341B88]">
+            {title}
+          </h2>
+
+          <p className="mt-1 text-sm text-gray-600">
+            {columnTasks.length} task
+            {columnTasks.length !== 1
+              ? "s"
+              : ""}
+          </p>
+        </div>
+
+        {/* TASKS */}
+
+        <div
+          data-kanban-status={status}
+          className="min-h-[350px] space-y-4"
+        >
+          {columnTasks.length > 0 ? (
+            columnTasks.map((task) => (
+              <KanbanCard
+                key={task._id}
+                task={task}
+                onPointerDown={
+                  handlePointerDown
+                }
+                onStatusChange={
+                  updateTaskStatus
+                }
+                isDragging={
+                  draggingTask?._id ===
+                  task._id
+                }
+              />
+            ))
+          ) : (
+            <div
+              data-kanban-status={status}
+              className={`flex min-h-[100px] items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition ${
+                isDragOver
+                  ? "border-[#341B88] bg-purple-50 text-[#341B88]"
+                  : "border-gray-200 text-gray-400"
+              }`}
+            >
+              {isDragOver
+                ? "Drop task here"
+                : "No tasks"}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // --------------------------------
+  // RENDER
+  // --------------------------------
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-[#EEF2FF] via-[#F8FAFC] to-[#E0E7FF]">
       <Navbar />
 
-      <div className="min-h-screen bg-slate-100 px-8 py-8">
+      <main className="px-4 pb-12 pt-28 sm:px-6">
 
-        {/* Header */}
+        {/* PAGE HEADER */}
 
-        <div className="bg-gradient-to-r from-[#39248B] to-[#6544F5] rounded-3xl text-white p-8 shadow-xl mt-20">
-
-          <h1 className="text-4xl font-bold">
-            📋 Kanban Board
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#341B88] sm:text-4xl">
+            Kanban Board
           </h1>
 
-          <p className="mt-2 text-lg text-gray-200">
-            Organize your workflow efficiently.
+          <p className="mt-2 text-sm text-gray-600 sm:text-base">
+            Drag and drop your tasks to change
+            their status.
           </p>
 
+          {/* MOBILE HELP */}
+
+          <div className="mt-4 rounded-lg border border-purple-100 bg-purple-50 px-4 py-3 text-sm text-[#341B88] md:hidden">
+            <strong>Mobile:</strong> Touch and
+            drag a task into another column.
+            You can also use the{" "}
+            <strong>Change Status</strong>{" "}
+            dropdown.
+          </div>
         </div>
 
-        {/* Search */}
+        {/* LOADING */}
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 mt-8">
+        {loading ? (
+          <div className="py-20 text-center">
+            <p className="text-xl text-gray-500">
+              Loading tasks...
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-          <input
-            type="text"
-            placeholder="🔍 Search Task..."
-            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+            {/* PENDING */}
 
-        </div>
+            {renderColumn(
+              "Pending",
+              "Pending",
+              pendingTasks,
+              "bg-orange-100"
+            )}
 
-        {/* Kanban */}
+            {/* IN PROGRESS */}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
+            {renderColumn(
+              "In Progress",
+              "In Progress",
+              progressTasks,
+              "bg-blue-100"
+            )}
 
-          {/* Pending */}
+            {/* COMPLETED */}
 
-          <div className="bg-orange-50 rounded-3xl shadow-[4px_0_15px_-5px_rgba(255,187,73,1)] p-5">
-
-            <div className="flex justify-between items-center mb-5">
-
-              <h2 className="text-xl font-bold text-orange-600">
-                🟠 Pending
-              </h2>
-
-              <span className="bg-orange-500 text-white px-3 py-1 rounded-full">
-                {pending.length}
-              </span>
-
-            </div>
-
-            <div className="space-y-4">
-
-              {pending.length === 0 ? (
-                <p className="text-gray-500 text-center py-5">
-                  No Pending Tasks
-                </p>
-              ) : (
-                pending.map((task) => (
-                  <KanbanCard key={task.id} task={task} />
-                ))
-              )}
-
-            </div>
+            {renderColumn(
+              "Completed",
+              "Completed",
+              completedTasks,
+              "bg-green-100"
+            )}
 
           </div>
-
-          {/* In Progress */}
-
-          <div className="bg-blue-50 rounded-3xl shadow-[4px_0_15px_-5px_rgba(99,102,241,1)] p-5">
-
-            <div className="flex justify-between items-center mb-5">
-
-              <h2 className="text-xl font-bold text-blue-600">
-                🔵 In Progress
-              </h2>
-
-              <span className="bg-blue-500 text-white px-3 py-1 rounded-full">
-                {progress.length}
-              </span>
-
-            </div>
-
-            <div className="space-y-4">
-
-              {progress.length === 0 ? (
-                <p className="text-gray-500 text-center py-5">
-                  No Tasks
-                </p>
-              ) : (
-                progress.map((task) => (
-                  <KanbanCard key={task.id} task={task} />
-                ))
-              )}
-
-            </div>
-
-          </div>
-
-          {/* Completed */}
-
-          <div className="bg-green-50 rounded-3xl shadow-[4px_0_15px_-5px_rgba(21,128,61,1)] p-5">
-
-            <div className="flex justify-between items-center mb-5">
-
-              <h2 className="text-xl font-bold text-green-600">
-                🟢 Completed
-              </h2>
-
-              <span className="bg-green-500 text-white px-3 py-1 rounded-full">
-                {completed.length}
-              </span>
-
-            </div>
-
-            <div className="space-y-4">
-
-              {completed.length === 0 ? (
-                <p className="text-gray-500 text-center py-5">
-                  No Completed Tasks
-                </p>
-              ) : (
-                completed.map((task) => (
-                  <KanbanCard key={task.id} task={task} />
-                ))
-              )}
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
+        )}
+      </main>
 
       <Footer />
-    </>
+    </div>
   );
 };
 

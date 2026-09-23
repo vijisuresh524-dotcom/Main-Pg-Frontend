@@ -1,82 +1,127 @@
-import React from "react";
-import { FaEdit, FaTrash, FaCalendarAlt, FaFlag } from "react-icons/fa";
+import {
+  FaGripVertical,
+} from "react-icons/fa";
 
-const KanbanCard = ({ task, onEdit, onDelete }) => {
-  const priorityColor = {
-    High: "bg-red-100 text-red-600",
-    Medium: "bg-yellow-100 text-yellow-700",
-    Low: "bg-green-100 text-green-700",
-  };
-
-  const statusColor = {
-    Pending: "bg-orange-100 text-orange-700",
-    "In Progress": "bg-blue-100 text-blue-700",
-    Completed: "bg-green-100 text-green-700",
-  };
-
+const KanbanCard = ({
+  task,
+  onPointerDown,
+  
+  isDragging,
+}) => {
   return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 p-5">
+    <div
+      onPointerDown={(event) =>
+        onPointerDown(event, task)
+      }
+      data-task-id={task._id}
+      className={`relative rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm transition ${
+        isDragging
+          ? "scale-105 opacity-70 shadow-2xl ring-2 ring-[#341B88]"
+          : "hover:shadow-md"
+      } touch-none select-none`}
+    >
+      {/* DRAG HANDLE */}
+
+      <div className="absolute right-3 top-3 text-gray-400">
+        <FaGripVertical />
+      </div>
 
       {/* Title */}
-      <h3 className="text-lg font-bold text-[#3D2396]">
+
+      <h3 className="pr-6 text-lg font-bold text-[#341B88]">
         {task.title}
       </h3>
 
       {/* Description */}
-      <p className="text-gray-600 text-sm mt-2 line-clamp-3">
+
+      <p className="mt-2 text-sm text-gray-600">
         {task.description}
       </p>
 
-      {/* Priority & Due Date */}
-      <div className="flex justify-between items-center mt-5">
+      {/* Priority */}
 
-        <span
-          className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-            priorityColor[task.priority]
-          }`}
-        >
-          <FaFlag />
+      <div className="mt-4">
+        <p className="text-xs font-semibold text-gray-500">
+          Priority
+        </p>
+
+        <p className="text-sm font-semibold">
           {task.priority}
-        </span>
+        </p>
+      </div>
 
-        <span className="flex items-center gap-2 text-gray-500 text-sm">
-          <FaCalendarAlt />
+      {/* Due Date */}
+
+      <div className="mt-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Due Date
+        </p>
+
+        <p className="text-sm">
           {task.dueDate}
-        </span>
-
+        </p>
       </div>
 
       {/* Status */}
+
       <div className="mt-4">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            statusColor[task.status]
+        <p className="text-xs font-semibold text-gray-500">
+          Status
+        </p>
+
+        <p
+          className={`mt-1 inline-block rounded-full px-3 py-1 text-sm font-semibold ${
+            task.status === "Completed"
+              ? "bg-green-100 text-green-700"
+              : task.status === "In Progress"
+              ? "bg-blue-100 text-blue-700"
+              : "bg-orange-100 text-orange-700"
           }`}
         >
           {task.status}
-        </span>
+        </p>
       </div>
 
-      {/* Buttons */}
-      {/* <div className="flex justify-end gap-3 mt-6">
+      {/* MOBILE STATUS SELECT */}
 
-        <button
-          onClick={() => onEdit && onEdit(task)}
-          className="text-blue-600 hover:text-blue-800"
+      {/* <div className="mt-4 border-t border-gray-200 pt-4">
+        <label className="mb-1 block text-xs font-semibold text-gray-500">
+          Change Status
+        </label>
+
+        <select
+          value={task.status}
+          onChange={(event) =>
+            onStatusChange(
+              task,
+              event.target.value
+            )
+          }
+          onPointerDown={(event) =>
+            event.stopPropagation()
+          }
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#341B88] focus:ring-2 focus:ring-purple-100"
         >
-          <FaEdit />
-        </button>
+          <option value="Pending">
+            Pending
+          </option>
 
-        <button
-          onClick={() => onDelete && onDelete(task.id)}
-          className="text-red-600 hover:text-red-800"
-        >
-          <FaTrash />
-        </button> */}
+          <option value="In Progress">
+            In Progress
+          </option>
 
-      </div>
+          <option value="Completed">
+            Completed
+          </option>
+        </select>
+      </div> */}
 
-    // </div>
+      {/* DRAG INSTRUCTION */}
+
+      <p className="mt-3 text-center text-xs text-gray-400">
+        Touch and drag to move
+      </p>
+    </div>
   );
 };
 

@@ -1,222 +1,470 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import {
-  FaHome,
-  FaClipboardList,
-  FaChartBar,
-  FaSignOutAlt,
+  FaTasks,
   FaBell,
-  FaBars,
+  FaSignOutAlt,
+  FaExclamationCircle,
+  FaCalendarDay,
   FaTimes,
+  FaBars,
 } from "react-icons/fa";
 
+import { apiRequest } from "../services/api";
 
-const NavBar = () => {
-const [showNotification, setShowNotification] = useState(false);
-
-const [menuOpen, setMenuOpen] = useState(false);
+const Navbar = () => {
   const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem("loggedInUser"));
+  const [notificationCount, setNotificationCount] =
+    useState(0);
 
-  const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
-  const tasks = JSON.parse(
-  localStorage.getItem(`tasks_${loggedUser.email}`)
-) || [];
+  const [notifications, setNotifications] =
+    useState([]);
 
-const today = new Date().toISOString().split("T")[0];
+  const [showNotifications, setShowNotifications] =
+    useState(false);
 
-const notifications = [];
+  const [showMobileMenu, setShowMobileMenu] =
+    useState(false);
 
-tasks.forEach((task) => {
-  if (task.status === "Completed") {
-    notifications.push(`✅ ${task.title} completed.`);
-  }
+  const user = JSON.parse(
+    localStorage.getItem("loggedInUser")
+  );
 
-  if (task.status === "In Progress") {
-    notifications.push(`🔵 ${task.title} is in progress.`);
-  }
+  // ============================================
+  // FETCH NOTIFICATIONS
+  // ============================================
 
-  if (task.dueDate === today) {
-    notifications.push(`📅 ${task.title} is due today.`);
-  }
+  const fetchNotifications = async () => {
+    try {
+      const response = await apiRequest("/tasks");
 
-  if (task.dueDate < today && task.status !== "Completed") {
-    notifications.push(`⚠️ ${task.title} is overdue.`);
-  }
+      const tasks = response.tasks || [];
 
-  if (task.priority === "High" && task.status !== "Completed") {
-    notifications.push(`🔥 High priority: ${task.title}`);
-  }
-});
+      const today = new Date()
+        .toISOString()
+        .split("T")[0];
+
+      const notificationTasks = tasks.filter((task) => {
+        const isHighPriority =
+          task.priority === "High";
+
+        const isDueToday =
+          task.dueDate === today;
+
+        const isIncomplete =
+          task.status !== "Completed";
+
+        return (
+          (isHighPriority && isIncomplete) ||
+          (isDueToday && isIncomplete)
+        );
+      });
+
+      setNotifications(notificationTasks);
+
+      setNotificationCount(
+        notificationTasks.length
+      );
+    } catch (error) {
+      console.error(
+        "Notification error:",
+        error.message
+      );
+    }
+  };
+
+  // ============================================
+  // INITIAL NOTIFICATION LOAD
+  // ============================================
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
+
+  // ============================================
+  // REFRESH WHEN TASK IS UPDATED
+  // ============================================
+
+  useEffect(() => {
+    const handleTaskUpdate = () => {
+      console.log(
+        "Task updated - refreshing notifications"
+      );
+
+      fetchNotifications();
+    };
+
+    window.addEventListener(
+      "taskUpdated",
+      handleTaskUpdate
+    );
+
+    return () => {
+      window.removeEventListener(
+        "taskUpdated",
+        handleTaskUpdate
+      );
+    };
+  }, []);
+
+  // ============================================
+  // LOGOUT
+  // ============================================
+
   const logout = () => {
-    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("token");
+
+    localStorage.removeItem(
+      "loggedInUser"
+    );
+
     navigate("/");
   };
 
+  // ============================================
+  // NOTIFICATION CLICK
+  // ============================================
+
+  const handleNotificationClick = (task) => {
+    setShowNotifications(false);
+
+    navigate(`/task/${task._id}`);
+  };
+
+  // ============================================
+  // CLOSE MOBILE MENU
+  // ============================================
+
+  const closeMobileMenu = () => {
+    setShowMobileMenu(false);
+  };
+
   return (
-    <div>
-   <nav className="fixed top-0 left-0 right-0 z-50 bg-[#341B88] text-white shadow-lg">
+    <nav className="fixed left-0 right-0 top-0 z-40 bg-[#341B88] text-white shadow-lg">
 
-  <div className="max-w-7xl mx-auto h-20 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      {/* ==========================================
+          MAIN NAVBAR
+      ========================================== */}
 
-    {/* Logo */}
-    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-      <FaClipboardList /> TaskSphere
-    </h1>
+      <div className="flex items-center justify-between px-4 py-4 sm:px-6">
 
-    {/* Desktop Menu */}
-    <div className="hidden lg:flex items-center gap-10 font-medium">
+        {/* ========================================
+            LOGO
+        ======================================== */}
 
-      <Link className="hover:text-cyan-300 transition" to="/dashboard">
-        Home
-      </Link>
+        <Link
+          to="/dashboard"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-2 text-xl font-bold sm:text-2xl"
+        >
+          <FaTasks />
 
-      <Link className="hover:text-cyan-300 transition" to="/kanban">
-        Kanban Board
-      </Link>
+          <span>TaskSphere</span>
+        </Link>
 
-      <Link className="hover:text-cyan-300 transition" to="/overview">
-        Overview
-      </Link>
+        {/* ========================================
+            DESKTOP LINKS
+        ======================================== */}
 
-    </div>
+        <div className="hidden items-center gap-6 md:flex">
 
-    {/* Right Side */}
-    <div className="hidden lg:flex items-center gap-5">
+          <Link
+            to="/dashboard"
+            className="transition hover:text-cyan-300"
+          >
+            Home
+          </Link>
 
-      <p className="font-semibold whitespace-nowrap">
-        Welcome, {user?.name}
-      </p>
+          <Link
+            to="/kanban"
+            className="transition hover:text-cyan-300"
+          >
+            Kanban Board
+          </Link>
 
-      {/* Notification */}
-      <div className="relative">
+          <Link
+            to="/overview"
+            className="transition hover:text-cyan-300"
+          >
+            Overview
+          </Link>
 
-        <button onClick={() => setShowNotification(!showNotification)}>
-          <FaBell className="text-2xl hover:text-yellow-300" />
-        </button>
+        </div>
 
-        <span className="absolute -top-2 -right-2 bg-red-500 text-xs w-5 h-5 rounded-full flex items-center justify-center">
-          {notifications.length}
-        </span>
+        {/* ========================================
+            RIGHT SIDE
+        ======================================== */}
 
-        {showNotification && (
-          <div className="absolute right-0 mt-4 w-72 bg-white text-gray-800 rounded-xl shadow-xl p-4">
-            <h3 className="font-semibold border-b pb-2">
-              Notifications
-            </h3>
+        <div className="flex items-center gap-2 sm:gap-4">
 
-            {notifications.length === 0 ? (
-              <p className="py-3 text-gray-500">
-                No notifications
-              </p>
-            ) : (
-              notifications.map((note, index) => (
-                <div
-                  key={index}
-                  className="py-2 border-b last:border-none text-sm"
-                >
-                  {note}
+          {/* ======================================
+              NOTIFICATION
+          ====================================== */}
+
+          <div className="relative">
+
+            <button
+              onClick={() =>
+                setShowNotifications(
+                  !showNotifications
+                )
+              }
+              className="relative rounded-full p-2 transition hover:bg-white/10"
+              title="Notifications"
+            >
+              <FaBell className="text-lg sm:text-xl" />
+
+              {notificationCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+
+            {/* ====================================
+                NOTIFICATION DROPDOWN
+            ==================================== */}
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-[calc(100vw-32px)] max-w-80 overflow-hidden rounded-xl bg-white text-gray-800 shadow-2xl">
+
+                {/* HEADER */}
+
+                <div className="flex items-center justify-between bg-[#341B88] px-4 py-3 text-white">
+
+                  <div className="flex items-center gap-2">
+
+                    <FaBell />
+
+                    <h3 className="font-semibold">
+                      Notifications
+                    </h3>
+
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setShowNotifications(false)
+                    }
+                    className="rounded p-1 transition hover:bg-white/20"
+                  >
+                    <FaTimes />
+                  </button>
+
                 </div>
-              ))
+
+                {/* NOTIFICATIONS */}
+
+                <div className="max-h-80 overflow-y-auto">
+
+                  {notifications.length === 0 ? (
+
+                    <div className="px-4 py-8 text-center text-gray-500">
+
+                      <FaBell className="mx-auto mb-2 text-2xl text-gray-300" />
+
+                      <p className="text-sm">
+                        No notifications
+                      </p>
+
+                    </div>
+
+                  ) : (
+
+                    notifications.map((task) => {
+
+                      const today =
+                        new Date()
+                          .toISOString()
+                          .split("T")[0];
+
+                      const isHighPriority =
+                        task.priority === "High";
+
+                      const isDueToday =
+                        task.dueDate === today;
+
+                      return (
+                        <button
+                          key={task._id}
+                          onClick={() =>
+                            handleNotificationClick(task)
+                          }
+                          className="flex w-full gap-3 border-b px-4 py-3 text-left transition hover:bg-gray-50"
+                        >
+
+                          {/* ICON */}
+
+                          <div className="mt-1">
+
+                            {isHighPriority ? (
+
+                              <FaExclamationCircle className="text-red-500" />
+
+                            ) : (
+
+                              <FaCalendarDay className="text-orange-500" />
+
+                            )}
+
+                          </div>
+
+                          {/* CONTENT */}
+
+                          <div className="flex-1">
+
+                            <p className="text-sm font-semibold text-gray-800">
+                              {task.title}
+                            </p>
+
+                            {isHighPriority && (
+                              <p className="mt-1 text-xs text-red-500">
+                                High priority task
+                              </p>
+                            )}
+
+                            {isDueToday && (
+                              <p className="mt-1 text-xs text-orange-500">
+                                Due today
+                              </p>
+                            )}
+
+                            {task.dueDate && (
+                              <p className="mt-1 text-xs text-gray-400">
+                                Due: {task.dueDate}
+                              </p>
+                            )}
+
+                          </div>
+
+                        </button>
+                      );
+                    })
+
+                  )}
+
+                </div>
+
+              </div>
             )}
+
           </div>
-        )}
+
+          {/* ======================================
+              USER PROFILE
+          ====================================== */}
+
+          <Link
+            to="/profile"
+            onClick={closeMobileMenu}
+            className="hidden items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium transition hover:bg-white/10 sm:flex"
+          >
+            <span>👤</span>
+
+            <span className="max-w-[120px] truncate">
+              {user?.name}
+            </span>
+          </Link>
+
+          {/* ======================================
+              LOGOUT
+          ====================================== */}
+
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 transition text-black"
+          >
+
+            <FaSignOutAlt />
+
+            <span className="hidden md:block">
+              Logout
+            </span>
+
+          </button>
+
+          {/* ======================================
+              MOBILE MENU BUTTON
+          ====================================== */}
+
+          <button
+            onClick={() =>
+              setShowMobileMenu(!showMobileMenu)
+            }
+            className="rounded-lg p-2 text-xl transition hover:bg-white/10 md:hidden"
+            aria-label="Toggle navigation menu"
+          >
+
+            {showMobileMenu ? (
+              <FaTimes />
+            ) : (
+              <FaBars />
+            )}
+
+          </button>
+
+        </div>
 
       </div>
 
-      <button
-        onClick={logout}
-        className="bg-red-400 px-5 py-2 rounded-xl hover:bg-red-500"
-      >
-        Logout
-      </button>
+      {/* ==========================================
+          MOBILE MENU
+      ========================================== */}
 
-    </div>
+      {showMobileMenu && (
 
-    {/* Mobile Menu Button */}
-    <button
-      className="lg:hidden text-2xl"
-      onClick={() => setMenuOpen(!menuOpen)}
-    >
-      {menuOpen ? <FaTimes /> : <FaBars />}
-    </button>
+        <div className="border-t border-white/20 bg-[#341B88] px-4 pb-5 pt-3 md:hidden">
 
-  </div>
+          {/* HOME */}
 
-  {/* Mobile Menu */}
-  {menuOpen && (
-    <div className="lg:hidden bg-[#41229D] px-6 py-5 space-y-5">
+          <Link
+            to="/dashboard"
+            onClick={closeMobileMenu}
+            className="block rounded-lg px-4 py-3 font-medium transition hover:bg-white/10 hover:text-cyan-300"
+          >
+            Home
+          </Link>
 
-      <p className="font-semibold">
-        Welcome, {user?.name}
-      </p>
+          {/* KANBAN */}
 
-      <Link
-        to="/dashboard"
-        onClick={() => setMenuOpen(false)}
-        className="block hover:text-cyan-300"
-      >
-        Home
-      </Link>
+          <Link
+            to="/kanban"
+            onClick={closeMobileMenu}
+            className="block rounded-lg px-4 py-3 font-medium transition hover:bg-white/10 hover:text-cyan-300"
+          >
+            Kanban Board
+          </Link>
 
-      <Link
-        to="/kanban"
-        onClick={() => setMenuOpen(false)}
-        className="block hover:text-cyan-300"
-      >
-        Kanban Board
-      </Link>
+          {/* OVERVIEW */}
 
-      <Link
-        to="/overview"
-        onClick={() => setMenuOpen(false)}
-        className="block hover:text-cyan-300"
-      >
-        Overview
-      </Link>
+          <Link
+            to="/overview"
+            onClick={closeMobileMenu}
+            className="block rounded-lg px-4 py-3 font-medium transition hover:bg-white/10 hover:text-cyan-300"
+          >
+            Overview
+          </Link>
 
-      {/* Notification */}
-      <button
-        onClick={() => setShowNotification(!showNotification)}
-        className="flex items-center gap-3"
-      >
-        <FaBell />
-        Notifications ({notifications.length})
-      </button>
+          {/* PROFILE */}
 
-      {showNotification && (
-        <div className="bg-white text-gray-800 rounded-lg p-3 max-h-60 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <p>No notifications</p>
-          ) : (
-            notifications.map((note, index) => (
-              <div
-                key={index}
-                className="border-b py-2 last:border-none text-sm"
-              >
-                {note}
-              </div>
-            ))
-          )}
+          <Link
+            to="/profile"
+            onClick={closeMobileMenu}
+            className="block rounded-lg px-4 py-3 font-medium transition hover:bg-white/10 hover:text-cyan-300 sm:hidden"
+          >
+            👤 Profile
+          </Link>
+
         </div>
+
       )}
 
-      <button
-        onClick={logout}
-        className="w-full bg-red-400 py-2 rounded-lg hover:bg-red-500"
-      >
-        Logout
-      </button>
-
-    </div>
-  )}
-
-</nav>
-    </div>
+    </nav>
   );
-}
+};
 
-  
-
-export default NavBar;
+export default Navbar;
