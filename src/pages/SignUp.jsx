@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { FaTasks } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
@@ -13,25 +12,32 @@ const SignUp = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Clear previous message
     setMessage("");
+    setMessageType("");
 
+    // Validation
     if (!name || !email || !password || !confirmPassword) {
       setMessage("Please fill all fields");
+      setMessageType("error");
       return;
     }
 
     if (password.length < 6) {
       setMessage("Password must be at least 6 characters");
+      setMessageType("error");
       return;
     }
 
     if (password !== confirmPassword) {
       setMessage("Passwords do not match");
+      setMessageType("error");
       return;
     }
 
@@ -48,29 +54,42 @@ const SignUp = () => {
         }),
       });
 
-      setMessage(response.message || "Account created successfully");
+      // Success message
+      setMessage(
+        response.message || "Account created successfully"
+      );
+      setMessageType("success");
 
+      // Go to login page after successful registration
       setTimeout(() => {
         navigate("/");
-      }, 1000);
+      }, 1500);
+
     } catch (error) {
-      setMessage(error.message || "Registration failed");
+      console.error("Registration error:", error);
+
+      // Show backend error on screen
+      setMessage(
+        error.message || "Registration failed"
+      );
+      setMessageType("error");
+
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eef2ff] via-[#dbeafe] to-[#eef2ff] flex items-center justify-center p-6">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#eef2ff] via-[#dbeafe] to-[#eef2ff] p-6">
 
-      <div className="w-full max-w-7xl min-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex bg-[#341B88]">
+      <div className="flex min-h-[90vh] w-full max-w-7xl overflow-hidden rounded-3xl bg-[#341B88] shadow-2xl">
 
         {/* LEFT SIDE */}
-        <div className="hidden lg:flex w-1/2 flex-col justify-center px-14 py-12 text-white">
+        <div className="hidden w-1/2 flex-col justify-center px-14 py-12 text-white lg:flex">
 
           <div className="mb-10">
 
-            <FaTasks className="text-6xl text-cyan-300 mb-5" />
+            <FaTasks className="mb-5 text-6xl text-cyan-300" />
 
             <h1 className="text-5xl font-bold">
               TaskSphere
@@ -90,7 +109,7 @@ const SignUp = () => {
             Achieve your goals.
           </h2>
 
-          <p className="mt-8 text-gray-300 max-w-lg">
+          <p className="mt-8 max-w-lg text-gray-300">
             Create your TaskSphere account and manage projects,
             deadlines and priorities from one beautiful dashboard.
           </p>
@@ -99,12 +118,15 @@ const SignUp = () => {
 
             <Link
               to="/"
-              className="border border-cyan-300 rounded-xl px-6 py-3 hover:bg-cyan-300 hover:text-[#341B88] transition"
+              className="rounded-xl border border-cyan-300 px-6 py-3 transition hover:bg-cyan-300 hover:text-[#341B88]"
             >
               Login
             </Link>
 
-            <button className="text-cyan-300">
+            <button
+              type="button"
+              className="text-cyan-300"
+            >
               Get Started
             </button>
 
@@ -113,40 +135,46 @@ const SignUp = () => {
         </div>
 
         {/* RIGHT SIDE */}
-        <div className="w-full lg:w-1/2 min-h-[90vh] flex items-center justify-center p-6 lg:p-10">
+        <div className="flex min-h-[90vh] w-full items-center justify-center p-6 lg:w-1/2 lg:p-10">
 
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl w-full max-w-md p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-3xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
 
             {/* ICON */}
-            <div className="w-16 h-16 rounded-full bg-cyan-300 flex items-center justify-center mx-auto">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-cyan-300">
 
               <FaTasks className="text-4xl text-[#341B88]" />
 
             </div>
 
             {/* BRAND */}
-            <h1 className="text-4xl font-bold mt-3 text-white text-center">
+            <h1 className="mt-3 text-center text-4xl font-bold text-white">
               TaskSphere
             </h1>
 
-            <p className="text-gray-300 mt-1 text-center">
+            <p className="mt-1 text-center text-gray-300">
               Organize your work efficiently
             </p>
 
             {/* TITLE */}
-            <h2 className="text-3xl font-bold text-white text-center mt-6">
+            <h2 className="mt-6 text-center text-3xl font-bold text-white">
               Create Account
             </h2>
 
-            <p className="text-center text-gray-300 mt-2 mb-6">
+            <p className="mb-6 mt-2 text-center text-gray-300">
               Join TaskSphere and start managing your tasks.
             </p>
 
             {/* MESSAGE */}
             {message && (
-              <p className="text-center text-cyan-300 mb-4">
+              <div
+                className={`mb-5 rounded-xl border px-4 py-3 text-center text-sm font-medium ${
+                  messageType === "success"
+                    ? "border-green-300/40 bg-green-500/20 text-green-200"
+                    : "border-red-300/40 bg-red-500/20 text-red-200"
+                }`}
+              >
                 {message}
-              </p>
+              </div>
             )}
 
             {/* FORM */}
@@ -155,7 +183,7 @@ const SignUp = () => {
               {/* NAME */}
               <div className="mb-4">
 
-                <label className="text-white mb-2 block">
+                <label className="mb-2 block text-white">
                   Full Name
                 </label>
 
@@ -163,8 +191,11 @@ const SignUp = () => {
                   type="text"
                   placeholder="Enter your full name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full h-12 rounded-xl bg-white/10 border border-white/20 px-4 text-white placeholder-gray-300 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300 transition"
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setMessage("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-white/20 bg-white/10 px-4 text-white outline-none transition placeholder:text-gray-300 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300"
                 />
 
               </div>
@@ -172,7 +203,7 @@ const SignUp = () => {
               {/* EMAIL */}
               <div className="mb-4">
 
-                <label className="text-white mb-2 block">
+                <label className="mb-2 block text-white">
                   Email
                 </label>
 
@@ -180,8 +211,11 @@ const SignUp = () => {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-12 rounded-xl bg-white/10 border border-white/20 px-4 text-white placeholder-gray-300 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300 transition"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setMessage("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-white/20 bg-white/10 px-4 text-white outline-none transition placeholder:text-gray-300 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300"
                 />
 
               </div>
@@ -189,7 +223,7 @@ const SignUp = () => {
               {/* PASSWORD */}
               <div className="mb-4">
 
-                <label className="text-white mb-2 block">
+                <label className="mb-2 block text-white">
                   Password
                 </label>
 
@@ -197,8 +231,11 @@ const SignUp = () => {
                   type="password"
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-12 rounded-xl bg-white/10 border border-white/20 px-4 text-white placeholder-gray-300 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300 transition"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setMessage("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-white/20 bg-white/10 px-4 text-white outline-none transition placeholder:text-gray-300 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300"
                 />
 
               </div>
@@ -206,7 +243,7 @@ const SignUp = () => {
               {/* CONFIRM PASSWORD */}
               <div className="mb-5">
 
-                <label className="text-white mb-2 block">
+                <label className="mb-2 block text-white">
                   Confirm Password
                 </label>
 
@@ -214,10 +251,11 @@ const SignUp = () => {
                   type="password"
                   placeholder="Confirm your password"
                   value={confirmPassword}
-                  onChange={(e) =>
-                    setConfirmPassword(e.target.value)
-                  }
-                  className="w-full h-12 rounded-xl bg-white/10 border border-white/20 px-4 text-white placeholder-gray-300 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300 transition"
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setMessage("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-white/20 bg-white/10 px-4 text-white outline-none transition placeholder:text-gray-300 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300"
                 />
 
               </div>
@@ -226,21 +264,23 @@ const SignUp = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 rounded-xl bg-cyan-300 text-[#341B88] font-semibold hover:bg-cyan-200 transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-12 w-full rounded-xl bg-cyan-300 font-semibold text-[#341B88] shadow-lg transition duration-300 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? "Creating Account..." : "Sign Up"}
+                {loading
+                  ? "Creating Account..."
+                  : "Sign Up"}
               </button>
 
             </form>
 
             {/* LOGIN LINK */}
-            <p className="text-center mt-5 text-gray-300">
+            <p className="mt-5 text-center text-gray-300">
 
               Already have an account?
 
               <Link
                 to="/"
-                className="text-cyan-300 ml-2 hover:underline"
+                className="ml-2 text-cyan-300 hover:underline"
               >
                 Login
               </Link>

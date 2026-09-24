@@ -117,10 +117,10 @@ const KanbanCard = ({
       </div> */}
 
       {/* DRAG INSTRUCTION */}
-
+{/* 
       <p className="mt-3 text-center text-xs text-gray-400">
         Touch and drag to move
-      </p>
+      </p> */}
     </div>
   );
 };
